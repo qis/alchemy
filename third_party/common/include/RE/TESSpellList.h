@@ -1,0 +1,44 @@
+#pragma once
+
+#include "RE/BaseFormComponent.h"
+
+
+namespace RE
+{
+	class SpellItem;
+	class TESLevSpell;
+	class TESShout;
+
+
+	class TESSpellList : BaseFormComponent
+	{
+	public:
+		inline static const void* RTTI = RTTI_TESSpellList;
+
+
+		struct ActorEffect	// SPLO
+		{
+			SpellItem**		spells;				// 00
+			TESLevSpell**	leveledSpells;		// 08
+			TESShout**		shouts;				// 10
+			UInt32			numSpells;			// 18
+			UInt32			numleveledSpells;	// 1C
+			UInt32			numShouts;			// 20
+			UInt32			pad24;				// 24
+		};
+		static_assert(sizeof(ActorEffect) == 0x28);
+
+
+		virtual ~TESSpellList();											// 00
+
+		// override (BaseFormComponent)
+		virtual void	Init() override;									// 01 - { return; }
+		virtual void	ReleaseRefs() override;								// 02
+		virtual void	CopyFromBase(BaseFormComponent* a_rhs) override;	// 03
+
+
+		// members
+		ActorEffect* actorEffects;	// 08 - SPLO
+	};
+	static_assert(sizeof(TESSpellList) == 0x10);
+}

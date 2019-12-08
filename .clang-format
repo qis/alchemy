@@ -1,0 +1,132 @@
+---
+BasedOnStyle: LLVM
+AccessModifierOffset: -2
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+AlignOperands: false
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: true
+BinPackParameters: false
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: true
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: true
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BreakBeforeInheritanceComma: false
+BreakInheritanceList: AfterColon
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializersBeforeComma: false
+BreakConstructorInitializers: BeforeColon
+BreakStringLiterals: false
+ColumnLimit: 120
+CommentPragmas: '^ (NOTE|TODO):'
+CompactNamespaces: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth: 2
+ContinuationIndentWidth: 2
+DerivePointerAlignment: false
+DisableFormat: false
+ExperimentalAutoDetectBinPacking: false
+FixNamespaceComments: true
+IncludeBlocks: Preserve
+IncludeIsMainRegex: '(_test)?$'
+IndentCaseLabels: false
+IndentPPDirectives: None
+IndentWidth: 2
+IndentWrappedFunctionNames: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 2
+NamespaceIndentation: None
+PenaltyBreakAssignment: 2000
+PenaltyBreakBeforeFirstCallParameter: 1000
+PenaltyBreakComment: 500
+PenaltyBreakFirstLessLess: 100
+PenaltyBreakString: 4000
+PenaltyBreakTemplateDeclaration: 10
+PenaltyExcessCharacter: 2
+PenaltyReturnTypeOnItsOwnLine: 3000
+PointerAlignment: Left
+ReflowComments: false
+SortIncludes: false
+SortUsingDeclarations: false
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 2
+SpacesInAngles: false
+SpacesInContainerLiterals: true
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+TabWidth: 8
+UseTab: Never
+---
+Language: Cpp
+Standard: Cpp11
+Cpp11BracedListStyle: false
+ForEachMacros:
+  - for co_await
+  - if constexpr
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<.*\.(hh|hpp|hxx)>'
+    Priority: 2
+  - Regex: '^<.*\/.*>'
+    Priority: 3
+  - Regex: '^<(ntifs|windows).h>'
+    Priority: 4
+  - Regex: '^<(ntddk|wdm.h>'
+    Priority: 5
+  - Regex: '^<(wdf|shellapi|winsock2|ws2tcpip|mswsock)\.h>'
+    Priority: 6
+  - Regex: '^<.*\.h>'
+    Priority: 7
+  - Regex: '^<c(assert|ctype|errno|fenv|float|inttypes|limits|locale|math|setjmp|signal|stdarg|stddef|stdint|stdio|stdlib|string|time|uchar|wchar|wctype)>'
+    Priority: 9
+  - Regex: '.*'
+    Priority: 8
+MacroBlockBegin: '^(BEGIN_.*MSG_MAP.*|ALT_MSG_MAP)$'
+MacroBlockEnd: '^(END_MSG_MAP)$'
+SortIncludes: true
+---
+Language: ObjC
+DisableFormat: true
+---
+Language: JavaScript
+JavaScriptQuotes: Double
+JavaScriptWrapImports: true
+---
+Language: Java
+BreakAfterJavaFieldAnnotations: true
+...

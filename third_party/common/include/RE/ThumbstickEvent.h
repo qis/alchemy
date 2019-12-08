@@ -1,0 +1,34 @@
+#pragma once
+
+#include "RE/IDEvent.h"
+
+
+namespace RE
+{
+	class ThumbstickEvent : public IDEvent
+	{
+	public:
+		inline static const void* RTTI = RTTI_ThumbstickEvent;
+
+
+		struct InputTypes
+		{
+			enum InputType : UInt32
+			{
+				kLeftThumbstick = 0x0B,
+				kRightThumbstick = 0x0C
+			};
+		};
+		using InputType = InputTypes::InputType;
+
+
+		bool	IsLeft() const;
+		bool	IsRight() const;
+
+
+		// members
+		float	x;	// 28
+		float	y;	// 2C
+	};
+	static_assert(sizeof(ThumbstickEvent) == 0x30);
+}

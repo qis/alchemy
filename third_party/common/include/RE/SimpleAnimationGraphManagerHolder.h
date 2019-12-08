@@ -1,0 +1,31 @@
+#pragma once
+
+#include "RE/IAnimationGraphManagerHolder.h"
+
+
+namespace RE
+{
+	struct BSIntrusiveRefCounted;
+
+
+	class SimpleAnimationGraphManagerHolder : public IAnimationGraphManagerHolder
+	{
+	public:
+		inline static const void* RTTI = RTTI_SimpleAnimationGraphManagerHolder;
+
+
+		// override (IAnimationGraphManagerHolder)
+		virtual bool	GetAnimationGraphManager(BSTSmartPointer<BSAnimationGraphManager>& a_out) override;		// 02 - { a_out = graphManager; return a_out; }
+		virtual bool	SetAnimationGraphManager(BSTSmartPointer<BSAnimationGraphManager>& a_in) override;		// 03 - { graphManager = a_in; return true; }
+		virtual bool	ConstructAnimationGraph(BSTSmartPointer<BShkbAnimationGraph>& a_out) override;			// 05
+
+		// add
+		virtual void	Unk_13(void);																			// 13 - { return; }
+
+
+		// members
+		BSTSmartPointer<BSAnimationGraphManager>	graphManager;	// 08
+		BSTSmartPointer<BSIntrusiveRefCounted>		unk10;			// 10
+	};
+	static_assert(sizeof(SimpleAnimationGraphManagerHolder) == 0x18);
+}

@@ -1,0 +1,15 @@
+{
+  "configurations": [
+    {
+      "name": "Release",
+      "generator": "Ninja",
+      "configurationType": "Release",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "cmakeToolchain": "${projectDir}\\res\\toolchain.cmake",
+      "cmakeExecutable": "C:\\Program Files\\CMake\\bin\\cmake.exe",
+      "installRoot": "C:\\Steam\\steamapps\\common\\Skyrim Special Edition\\Data",
+      "buildRoot": "${projectDir}\\build",
+      "variables": []
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+#pragma once
+
+#include "RE/SkyObject.h"
+
+
+namespace RE
+{
+	class NiNode;
+
+
+	class Stars : public SkyObject
+	{
+	public:
+		inline static const void* RTTI = RTTI_Stars;
+
+
+		virtual ~Stars();					// 00
+
+		// override (SkyObject)
+		virtual void Unk_03(void) override;	// 03
+
+
+		// members
+		NiNode*	unk10;	// 10
+		UInt64	unk18;	// 18
+	};
+	static_assert(sizeof(Stars) == 0x20);
+}

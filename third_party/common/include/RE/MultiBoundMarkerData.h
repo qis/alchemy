@@ -1,0 +1,32 @@
+#pragma once
+
+#include "RE/BSExtraData.h"
+#include "RE/ExtraDataTypes.h"
+
+
+namespace RE
+{
+	class MultiBoundMarkerData : public BSExtraData
+	{
+	public:
+		inline static const void* RTTI = RTTI_MultiBoundMarkerData;
+
+
+		enum { kExtraTypeID = ExtraDataType::kMultiBoundMarkerData };
+
+
+		virtual ~MultiBoundMarkerData();												// 00
+
+		// override (BSExtraData)
+		virtual ExtraDataType	GetType() const override;								// 01 - { reutrn kMultiBoundMarkerData; }
+		virtual bool			IsNotEqual(const BSExtraData* a_rhs) const override;	// 02
+
+
+		// members
+		float	unk10;	// 10
+		float	unk14;	// 14
+		float	unk18;	// 18
+		UInt32	pad1C;	// 1C
+	};
+	static_assert(sizeof(MultiBoundMarkerData) == 0x20);
+}
