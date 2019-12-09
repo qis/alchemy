@@ -3,21 +3,27 @@
 namespace alchemy {
 
 struct Effect {
-  RE::EffectSetting::Data::Archetype archetype = RE::EffectSetting::Data::Archetype::kScript;
-  RE::EffectSetting::Data::Flag flags = RE::EffectSetting::Data::Flag::kNone;
-  float baseCost = 0.0f;
-  UInt32 duration = 0;
-  float magnitude = 0.0f;
   std::string name;
+  float cost = 0.0f;
 
   Effect() noexcept = default;
-  Effect(RE::Effect* effect) noexcept {
-    archetype = effect->baseEffect->data.archetype;
-    flags = effect->baseEffect->data.flags;
-    baseCost = effect->baseEffect->data.baseCost;
-    duration = effect->effectItem.duration;
-    magnitude = effect->effectItem.magnitude;
+  Effect(RE::Effect* effect, float power) noexcept {
     name = effect->baseEffect->GetFullName();
+    auto flags = effect->baseEffect->data.flags;
+    auto baseCost = effect->baseEffect->data.baseCost;
+    auto magnitude = effect->effectItem.magnitude;
+    if (static_cast<UInt32>(flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kNoMagnitude) || magnitude < 0.0f) {
+      magnitude = 1.0f;
+    } else if (static_cast<UInt32>(flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kPowerAffectsMagnitude)) {
+      magnitude = round(std::pow(magnitude * power, 1.1f));
+    }
+    auto duration = effect->effectItem.duration;
+    if (static_cast<UInt32>(flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kNoDuration) || duration < 0.0f) {
+      duration = 1.0f;
+    } else if (static_cast<UInt32>(flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kPowerAffectsDuration)) {
+      duration = round(std::pow(duration * power / 10.0f, 1.1f));
+    }
+    cost = floor(baseCost * magnitude * duration);
   }
 };
 
@@ -28,21 +34,37 @@ struct Ingredient {
   std::array<Effect, 4> effects;
 
   Ingredient() noexcept = default;
-  Ingredient(UInt32 id, RE::TESBoundObject* object, SInt32 count) noexcept : id(id), count(count) {
+  Ingredient(UInt32 id, RE::TESBoundObject* object, SInt32 count, float power) noexcept : id(id), count(count) {
     const auto ingredient = object->As<RE::IngredientItem*>();
     name = ingredient->GetName();
-    if (ingredient->effects.size() >= 4) {
-      for (std::size_t i = 0; i < 4; i++) {
-        effects[i] = ingredient->effects[i];
-      }
-      std::sort(effects.begin(), effects.end(), [](const auto& lhs, const auto& rhs) noexcept {
-        return static_cast<UInt32>(lhs.archetype) < static_cast<UInt32>(rhs.archetype);
-      });
+    for (std::size_t i = 0; i < 4; i++) {
+      effects[i] = { ingredient->effects[i], power };
     }
+    std::sort(effects.begin(), effects.end(), [](const auto& lhs, const auto& rhs) noexcept {
+      return lhs.name < rhs.name;
+    });
   }
 };
 
 std::vector<Ingredient> GetIngredients(RE::PlayerCharacter* player) {
+  const auto settings = RE::GameSettingCollection::GetSingleton();
+  auto ingredientMult = settings->GetSetting("fAlchemyIngredientInitMult")->GetFloat();
+  auto skillFactor = settings->GetSetting("fAlchemySkillFactor")->GetFloat();
+  auto alchemySkill = player->GetActorValueCurrent(RE::ActorValue::kAlchemy);
+  auto fortifyAlchemy = player->GetActorValueCurrent(RE::ActorValue::kAlchemyModifier);
+  auto alchemistPerk = 0.0f;
+  for (const auto& e : player->perks) {
+    if (e->GetFullName() == std::string_view("Alchemy Mastery")) {
+      alchemistPerk += 20.0f;
+    }
+  }
+  // clang-format off
+  const auto power =
+    ingredientMult *
+    (1.0f + (skillFactor - 1.0f) * alchemySkill / 100.0f) *
+    (1.0f + fortifyAlchemy / 100.0f) *
+    (1.0f + alchemistPerk / 100.0f);
+  // clang-format on
   std::vector<Ingredient> ingredients;
   if (const auto changes = player->GetInventoryChanges(); changes && changes->entryList) {
     for (const auto& entry : *changes->entryList) {
@@ -54,7 +76,7 @@ std::vector<Ingredient> GetIngredients(RE::PlayerCharacter* player) {
         if (it != ingredients.end()) {
           it->count += entry->countDelta;
         } else {
-          ingredients.emplace_back(id, entry->type, entry->countDelta);
+          ingredients.emplace_back(id, entry->type, entry->countDelta, power);
         }
       }
     }
@@ -68,206 +90,93 @@ std::vector<Ingredient> GetIngredients(RE::PlayerCharacter* player) {
       if (it != ingredients.end()) {
         it->count += entry->count;
       } else {
-        ingredients.emplace_back(id, entry->form, entry->count);
+        ingredients.emplace_back(id, entry->form, entry->count, power);
       }
     }
     return true;
   });
-#if ALCHEMY_PRECISE
   std::sort(ingredients.begin(), ingredients.end(), [](const auto& lhs, const auto& rhs) noexcept {
     return lhs.name < rhs.name;
   });
-#endif
   return ingredients;
 }
 
-struct Alchemy {
-#if ALCHEMY_PRECISE
-  float powerFactor = 1.0f;
-#endif
-
-  Alchemy(RE::PlayerCharacter* player) {
-#if ALCHEMY_PRECISE
-    const auto settings = RE::GameSettingCollection::GetSingleton();
-
-    auto ingredientMult = settings->GetSetting("fAlchemyIngredientInitMult")->GetFloat();
-    if (ingredientMult <= 0.001) {
-      ingredientMult = 1.0f;
-    }
-
-    auto skillFactor = settings->GetSetting("fAlchemySkillFactor")->GetFloat();
-    if (skillFactor < 1.0f) {
-      skillFactor = 1.0f;
-    }
-
-    auto alchemySkill = player->GetActorValueCurrent(RE::ActorValue::kAlchemy);
-    if (alchemySkill < 0.0f) {
-      alchemySkill = 0.0f;
-    }
-
-    auto fortifyAlchemy = player->GetActorValueCurrent(RE::ActorValue::kAlchemyModifier);
-    if (fortifyAlchemy < 0.0f) {
-      fortifyAlchemy = 0.0f;
-    }
-
-    auto alchemistPerk = 0.0f;
-    //for (const auto& e : player->perks) {
-    //  if (e->GetFullName() == std::string_view("Alchemy Mastery")) {
-    //    alchemistPerk += 20.0f;
-    //  }
-    //}
-
-    // clang-format off
-    powerFactor =
-      ingredientMult *
-      (1.0f + (skillFactor - 1.0f) * alchemySkill / 100.0f) *
-      (1.0f + fortifyAlchemy / 100.0f) *
-      (1.0f + alchemistPerk / 100.0f);
-    // clang-format on
-#endif
-  }
-
-  float GetValue(const Effect& e) const noexcept {
-#if ALCHEMY_PRECISE
-    // Magnitude
-    auto magnitude = e.magnitude;
-    if (static_cast<UInt32>(e.flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kNoMagnitude) || magnitude < 0.0f) {
-      magnitude = 0.0f;
-    }
-    auto magnitudeFactor = 1.0f;
-    if (static_cast<UInt32>(e.flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kPowerAffectsMagnitude)) {
-      magnitudeFactor = powerFactor;
-    }
-    magnitude = round(magnitude * magnitudeFactor);
-
-    // Duration
-    auto duration = e.duration;
-    if (static_cast<UInt32>(e.flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kNoDuration) || duration < 0.0f) {
-      duration = 0.0f;
-    }
-    auto durationFactor = 1.0f;
-    if (static_cast<UInt32>(e.flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kPowerAffectsDuration)) {
-      durationFactor = powerFactor;
-    }
-    duration = round(duration * durationFactor);
-
-    // Magnitude Factor
-    magnitudeFactor = 1.0f;
-    if (magnitude > 0.0f) {
-      magnitudeFactor = magnitude;
-    }
-
-    // Duration Factor
-    durationFactor = 1.0f;
-    if (duration > 0.0f) {
-      durationFactor = duration / 10.0f;
-    }
-
-    // Cost
-    return floor(std::pow(e.baseCost * (magnitudeFactor * durationFactor), 1.1f));
-#else
-    auto multiplier = 1.0f;
-    if (!(static_cast<UInt32>(e.flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kNoMagnitude)) && e.magnitude > 0.0f) {
-      multiplier *= e.magnitude;
-    }
-    if (!(static_cast<UInt32>(e.flags) & static_cast<UInt32>(RE::EffectSetting::Data::Flag::kNoDuration)) && e.duration > 0.0f) {
-      multiplier *= e.duration;
-    }
-    return floor(e.baseCost * multiplier);
-#endif
-  }
-
-  struct Match {
-    RE::EffectSetting::Data::Archetype archetype = RE::EffectSetting::Data::Archetype::kScript;
-    float value = 0.0f;
-  };
-
-  float GetValue(const Ingredient& i0, const Ingredient& i1) const noexcept {
-    std::size_t count = 0;
-    std::array<Match, 4> matches;
-
-    const auto update = [&](const Effect& one, const Effect& two) noexcept {
-      if (one.archetype != two.archetype) {
-        return;
-      }
-      const auto value = std::max(GetValue(one), GetValue(two));
-      for (std::size_t i = 0; i < count; i++) {
-        if (matches[i].archetype == one.archetype) {
-          matches[i].value = std::max(matches[i].value, value);
-          return;
-        }
-      }
-      matches[count++] = { one.archetype, value };
-    };
-
-    for (const auto& e0 : i0.effects) {
-      for (const auto& e1 : i1.effects) {
-        update(e0, e1);
-      }
-    }
-
-    float value = 0.0f;
-    for (std::size_t i = 0; i < count; i++) {
-      value += matches[i].value;
-    }
-    return value;
-  }
-
-  float GetValue(const Ingredient& i0, const Ingredient& i1, const Ingredient& i2) const noexcept {
-    std::size_t count = 0;
-    std::array<Match, 6> matches;
-    std::array<bool, 3> used = { false, false, false };
-
-    const auto update = [&](const Effect& one, const Effect& two) noexcept {
-      if (one.archetype != two.archetype) {
-        return false;
-      }
-      const auto value = std::max(GetValue(one), GetValue(two));
-      for (std::size_t i = 0; i < count; i++) {
-        if (matches[i].archetype == one.archetype) {
-          matches[i].value = std::max(matches[i].value, value);
-          return false;
-        }
-      }
-      matches[count++] = { one.archetype, value };
-      return true;
-    };
-
-    for (const auto& e0 : i0.effects) {
-      for (const auto& e1 : i1.effects) {
-        for (const auto& e2 : i2.effects) {
-          if (update(e0, e1)) {
-            used[0] = used[1] = true;
-          }
-          if (update(e0, e2)) {
-            used[0] = used[2] = true;
-          }
-          if (update(e1, e2)) {
-            used[1] = used[2] = true;
-          }
-        }
-      }
-    }
-
-    for (const auto e : used) {
-      if (!e) {
-        return 0.0f;
-      }
-    }
-
-    float value = 0.0f;
-    for (std::size_t i = 0; i < count; i++) {
-      value += matches[i].value;
-    }
-    return value;
-  }
+struct Match {
+  std::string name;
+  float cost = 0.0f;
 };
 
+float GetCost(const Ingredient& i0, const Ingredient& i1) noexcept {
+  std::size_t count = 0;
+  std::array<Match, 4> matches;
+  const auto update = [&](const Effect& e0, const Effect& e1) noexcept {
+    if (e0.name != e1.name) {
+      return;
+    }
+    const auto cost = std::max(e0.cost, e1.cost);
+    for (std::size_t i = 0; i < count; i++) {
+      if (matches[i].name == e0.name) {
+        matches[i].cost = std::max(matches[i].cost, cost);
+        return;
+      }
+    }
+    matches[count++] = { e0.name, cost };
+  };
+  for (const auto& e0 : i0.effects) {
+    for (const auto& e1 : i1.effects) {
+      update(e0, e1);
+    }
+  }
+  auto cost = 0.0f;
+  for (std::size_t i = 0; i < count; i++) {
+    cost += matches[i].cost;
+  }
+  return cost;
+}
+
+float GetCost(const Ingredient& i0, const Ingredient& i1, const Ingredient& i2) noexcept {
+  std::size_t count = 0;
+  std::array<Match, 6> matches;
+  const auto update = [&](const Effect& e0, const Effect& e1) noexcept {
+    if (e0.name != e1.name) {
+      return;
+    }
+    const auto cost = std::max(e0.cost, e1.cost);
+    for (std::size_t i = 0; i < count; i++) {
+      if (matches[i].name == e0.name) {
+        matches[i].cost = std::max(matches[i].cost, cost);
+        return;
+      }
+    }
+    matches[count++] = { e0.name, cost };
+  };
+  for (const auto& e0 : i0.effects) {
+    for (const auto& e1 : i1.effects) {
+      update(e0, e1);
+    }
+  }
+  for (const auto& e0 : i0.effects) {
+    for (const auto& e2 : i2.effects) {
+      update(e0, e2);
+    }
+  }
+  for (const auto& e1 : i1.effects) {
+    for (const auto& e2 : i2.effects) {
+      update(e1, e2);
+    }
+  }
+  auto cost = 0.0f;
+  for (std::size_t i = 0; i < count; i++) {
+    cost += matches[i].cost;
+  }
+  return cost;
+}
+
 std::string_view GetUniqueName(const std::vector<Ingredient>& ingredients, const Ingredient& ingredient) noexcept {
-  std::string_view name = ingredient.name;
   const auto beg = ingredients.begin();
   const auto end = ingredients.end();
-  for (auto pos = name.find(' '); pos != std::string_view::npos; pos = name.find(pos + 1, ' ')) {
+  for (auto pos = ingredient.name.find(' '); pos != std::string_view::npos; pos = ingredient.name.find(pos + 1, ' ')) {
+    std::string_view name{ ingredient.name.data(), pos };
     for (auto it = beg; it < end; ++it) {
       if (it->name == ingredient.name) {
         continue;
@@ -276,16 +185,14 @@ std::string_view GetUniqueName(const std::vector<Ingredient>& ingredients, const
         goto retry;
       }
     }
-    name = { ingredient.name.data(), pos };
-    break;
+    return name;
   retry:
     continue;
   }
-  return name;
+  return ingredient.name;
 }
 
 void OnAlchemy(RE::PlayerCharacter* player) {
-  const auto alchemy = Alchemy{ player };
   const auto ingredients = GetIngredients(player);
 
   std::mutex mutex;
@@ -298,14 +205,14 @@ void OnAlchemy(RE::PlayerCharacter* player) {
     float curValue = 0.0f;
     std::array<Ingredient, 3> curPotion;
     for (std::size_t i1 = i0 + 1; i1 < size; i1++) {
-      if (const auto value = alchemy.GetValue(ingredients[i0], ingredients[i1]); value > curValue + 1.0f) {
+      if (const auto value = GetCost(ingredients[i0], ingredients[i1]); value > curValue + 1.0f) {
         curValue = value;
         curPotion[0] = ingredients[i0];
         curPotion[1] = ingredients[i1];
         curPotion[2] = {};
       }
       for (std::size_t i2 = i1 + 1; i2 < size; i2++) {
-        if (const auto value = alchemy.GetValue(ingredients[i0], ingredients[i1], ingredients[i2]); value > curValue + 1.0f) {
+        if (const auto value = GetCost(ingredients[i0], ingredients[i1], ingredients[i2]); value > curValue + 1.0f) {
           curValue = value;
           curPotion[0] = ingredients[i0];
           curPotion[1] = ingredients[i1];
@@ -327,89 +234,21 @@ void OnAlchemy(RE::PlayerCharacter* player) {
       return lhs.name < rhs.name;
     });
     fmt::memory_buffer buffer;
-
-    fmt::memory_buffer bufferDebug;
-
     for (const auto& e : maxPotion) {
       if (e.id) {
         if (buffer.size()) {
           fmt::format_to(buffer, " | ");
         }
         fmt::format_to(buffer, "{}", GetUniqueName(ingredients, e));
-
-        // clang-format off
-        fmt::format_to(bufferDebug, "{}: {} ({}) | {} ({}) | {} ({}) | {} ({})\n", e.name,
-          e.effects[0].name, alchemy.GetValue(e.effects[0]),
-          e.effects[1].name, alchemy.GetValue(e.effects[1]),
-          e.effects[2].name, alchemy.GetValue(e.effects[2]),
-          e.effects[3].name, alchemy.GetValue(e.effects[3]));
-        // clang-format on
       }
     }
+#if ALCHEMY_DEBUG
+    fmt::format_to(buffer, " ({})", maxValue);
+#endif
     buffer.push_back('\0');
     RE::DebugNotification(buffer.data());
     console->Print(buffer.data());
-
-    bufferDebug.push_back('\0');
-    console->Print(bufferDebug.data());
   }
-
-#if ALCHEMY_DEBUG
-  const auto beg = ingredients.begin();
-  const auto end = ingredients.end();
-  const auto chaurus_eggs = std::find_if(beg, end, [](const auto& ingredient) noexcept {
-    return ingredient.name == "Chaurus Eggs";
-  });
-  if (chaurus_eggs == end) {
-    console->Print("Could not find ingredient: Chaurus Eggs");
-    return;
-  }
-  const auto spider_egg = std::find_if(beg, end, [](const auto& ingredient) noexcept {
-    return ingredient.name == "Spider Egg";
-  });
-  if (spider_egg == end) {
-    console->Print("Could not find ingredient: Spider Egg");
-    return;
-  }
-  const auto vampire_dust = std::find_if(beg, end, [](const auto& ingredient) noexcept {
-    return ingredient.name == "Vampire Dust";
-  });
-  if (vampire_dust == end) {
-    console->Print("Could not find ingredient: Vampire Dust");
-    return;
-  }
-  const auto glow_dust = std::find_if(beg, end, [](const auto& ingredient) noexcept {
-    return ingredient.name == "Glow Dust";
-  });
-  if (glow_dust == end) {
-    console->Print("Could not find ingredient: Glow Dust");
-    return;
-  }
-  const auto imp_stool = std::find_if(beg, end, [](const auto& ingredient) noexcept {
-    return ingredient.name == "Imp Stool";
-  });
-  if (imp_stool == end) {
-    console->Print("Could not find ingredient: Imp Stool");
-    return;
-  }
-  const auto swamp_fungal_pod = std::find_if(beg, end, [](const auto& ingredient) noexcept {
-    return ingredient.name == "Swamp Fungal Pod";
-  });
-  if (swamp_fungal_pod == end) {
-    console->Print("Could not find ingredient: Swamp Fungal Pod");
-    return;
-  }
-  const auto one = alchemy.GetValue(*chaurus_eggs, *spider_egg, *vampire_dust);
-  const auto one_expected = 190.0f;
-  const auto two = alchemy.GetValue(*glow_dust, *imp_stool, *swamp_fungal_pod);
-  const auto two_expected = 257.0f;
-  // clang-format off
-  console->Print(fmt::format("{}/{} = {} | {}/{} = {}",
-    static_cast<int>(one), static_cast<int>(one_expected), one / one_expected,
-    static_cast<int>(two), static_cast<int>(two_expected), two / two_expected
-  ).data());
-  // clang-format on
-#endif
 }
 
 class InputEventHandler : public RE::BSTEventSink<RE::InputEvent*> {
