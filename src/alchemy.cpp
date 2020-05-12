@@ -260,7 +260,14 @@ public:
     const auto event = *event_ptr;
     if (event->eventType == RE::InputEvent::EventType::kButton && event->deviceType == RE::DeviceType::kKeyboard) {
       const auto button = static_cast<RE::ButtonEvent*>(event);
-      if (button->keyMask == 21 && button->IsDown() && RE::MenuManager::GetSingleton()->IsMenuOpen("Crafting Menu")) {
+
+      // See %UserProfile%\Documents\My Games\Skyrim Special Edition\SKSE\alchemy.log.
+      //if (button->IsDown() && RE::MenuManager::GetSingleton()->IsMenuOpen("Crafting Menu")) {
+      //  LOG_MESSAGE("key: %d", button->keyMask);
+      //}
+
+      // Key mask: 'C' 46
+      if (button->keyMask == 46 && button->IsDown() && RE::MenuManager::GetSingleton()->IsMenuOpen("Crafting Menu")) {
         if (const auto player = RE::PlayerCharacter::GetSingleton()) {
           try {
             OnAlchemy(player);
